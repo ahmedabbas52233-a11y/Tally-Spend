@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.eggs/
+
+# Node
+node_modules/
+.npm
+.yarn-integrity
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Build artifacts (keep dist/ tracked for Vercel)
+# dist/ is intentionally NOT ignored — Vercel reads it
