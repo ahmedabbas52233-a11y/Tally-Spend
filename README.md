@@ -63,6 +63,16 @@ Backend: FastAPI, Pandas, Uvicorn
 Frontend: React 18, Vite, Tailwind CSS, Recharts, Lucide Icons
 Testing: pytest
 
+📁 CSV Format
+Your uploaded file should contain these columns (names are fuzzy-matched):
+Table
+Canonical	Accepted Variants
+date	transaction_date, posted, posting_date, txn_date
+amount amt, debit, credit, transaction_amount, value
+description	details, narration, memo, payee
+account	account_name, source, wallet, bank, card
+
+
 ## 🚀 Quick Start (Local)
 
 ### Prerequisites
