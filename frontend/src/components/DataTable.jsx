@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -45,6 +45,15 @@ export function DataTable({
   const [sortKey, setSortKey] = useState(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [search, setSearch] = useState("");
+
+  // Bug fix: previously `page` never reset when `data` changed upstream
+  // (e.g. an account/month filter narrowed the result set). If the user was
+  // on, say, page 3 and the new filtered set only had 1 page, `pageData`
+  // would silently become an empty slice — the table looked broken even
+  // though valid data existed.
+  useEffect(() => {
+    setPage(0);
+  }, [data]);
 
   const allCols = useMemo(
     () => columns || Object.keys(data?.[0] || {}).map((k) => ({ key: k, label: k })),
@@ -176,7 +185,7 @@ export function DataTable({
           <tbody>
             {pageData.map((row, i) => (
               <tr
-                key={i}
+                key={`${row.date ?? ""}-${row.description ?? row.merchant ?? ""}-${row.amount ?? ""}-${i}`}
                 className="border-t transition-colors hover:bg-white/[0.025]"
                 style={{ borderColor: "rgba(255,255,255,0.05)" }}
               >
@@ -184,7 +193,14 @@ export function DataTable({
                   const raw = row[col.key];
                   const display = col.format ? col.format(raw) : String(raw ?? "");
                   const isNum = typeof raw === "number";
-                  const isNeg = isNum && raw < 0;
+                  // Only the currency "amount" column should use income/expense
+                  // green-red semantics. Previously ANY non-negative numeric
+                  // column (e.g. a z-score in the Anomalies table) was rendered
+                  // green as if it were money gained, which is meaningless and
+                  // misleading for non-currency numeric data.
+                  const isAmountCol = col.key === "amount";
+                  const isNeg = isAmountCol && isNum && raw < 0;
+                  const isPos = isAmountCol && isNum && raw >= 0;
                   const isRecurring = col.key === "is_recurring";
                   const isCategory = col.key === "category";
 
@@ -195,7 +211,7 @@ export function DataTable({
                       style={{
                         color: isNeg
                           ? "#f43f5e"
-                          : isNum
+                          : isPos
                           ? "#10b981"
                           : "var(--text-secondary)",
                         fontFamily: isNum ? "DM Mono, monospace" : "inherit",

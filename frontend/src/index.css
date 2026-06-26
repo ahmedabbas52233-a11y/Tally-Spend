@@ -11,7 +11,7 @@
     --border-accent: rgba(6, 182, 212, 0.3);
     --text-primary: #e8edf5;
     --text-secondary: #8b9ab5;
-    --text-muted: #4e6080;
+    --text-muted: #6b80a5;
     --cyan: #06b6d4;
     --amber: #f59e0b;
     --green: #10b981;
@@ -123,8 +123,8 @@
     font-family: "DM Sans", sans-serif;
     color: var(--text-primary);
     transition: border-color 0.2s, box-shadow 0.2s;
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
   }
   .input:focus {
     outline: none;

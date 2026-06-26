@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 
 
-def currency_fmt(amount: float, currency: str = "PKR") -> str:
+def currency_fmt(amount: float, currency: str = "USD") -> str:
     try:
         return f"{currency} {amount:,.2f}"
     except Exception:

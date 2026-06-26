@@ -27,5 +27,12 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Build artifacts (keep dist/ tracked for Vercel)
-# dist/ is intentionally NOT ignored — Vercel reads it
+# Build artifacts — Vercel runs its own buildCommand (see vercel.json) on every
+# deploy, so a committed dist/ is unnecessary dead weight and risks going stale.
+dist/
+frontend/dist/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local

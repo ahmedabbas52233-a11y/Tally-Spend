@@ -150,9 +150,10 @@ export function Sidebar({
           </p>
 
           <div>
-            <label className="label">Account</label>
+            <label className="label" htmlFor="filter-account">Account</label>
             <div className="relative">
               <select
+                id="filter-account"
                 className="input pr-8"
                 value={filters.account_filter}
                 onChange={(e) => update("account_filter", e.target.value)}
@@ -164,14 +165,16 @@ export function Sidebar({
               <ChevronDown
                 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: "var(--text-muted)" }}
+                aria-hidden="true"
               />
             </div>
           </div>
 
           <div>
-            <label className="label">Month</label>
+            <label className="label" htmlFor="filter-month">Month</label>
             <div className="relative">
               <select
+                id="filter-month"
                 className="input pr-8"
                 value={filters.month_filter}
                 onChange={(e) => update("month_filter", e.target.value)}
@@ -183,6 +186,7 @@ export function Sidebar({
               <ChevronDown
                 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: "var(--text-muted)" }}
+                aria-hidden="true"
               />
             </div>
           </div>
@@ -213,6 +217,8 @@ export function Sidebar({
               value={filters.months_window}
               className="accent-cyan"
               onChange={(e) => update("months_window", parseInt(e.target.value))}
+              aria-label="Recurring detection window in months"
+              aria-valuetext={`${filters.months_window} months`}
             />
             <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
               <span>2</span>
@@ -238,6 +244,8 @@ export function Sidebar({
               value={filters.z_thresh}
               className="accent-amber"
               onChange={(e) => update("z_thresh", parseFloat(e.target.value))}
+              aria-label="Anomaly detection sensitivity in standard deviations"
+              aria-valuetext={`${filters.z_thresh} standard deviations`}
             />
             <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
               <span>2</span>
@@ -270,6 +278,9 @@ export function Sidebar({
           boxShadow: "0 4px 20px rgba(6,182,212,0.4)",
         }}
         onClick={() => setMobileOpen((o) => !o)}
+        role="button"
+        aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={mobileOpen}
       >
         {mobileOpen ? (
           <X className="w-5 h-5 text-white" />
@@ -283,29 +294,31 @@ export function Sidebar({
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
 
-      {/* Desktop sidebar */}
+      {/*
+        Single sidebar instance, responsive via CSS only.
+        Previously this rendered TWO separate <aside> trees (desktop + mobile)
+        both containing the exact same `sidebarContent`, which meant:
+          - the shared `fileRef` only ever pointed at one of the two file
+            inputs (whichever mounted last), so clicking the dropzone could
+            silently open the wrong instance's picker
+          - every <select>, slider and the loading spinner existed twice in
+            the DOM at all times (one just visually off-screen), which breaks
+            accessibility (duplicate labelled controls) and any test selector
+            that expects a unique element (e.g. Testing Library's getByLabelText)
+        Now there is exactly one instance; mobile vs desktop is purely a CSS
+        position/transform swap at the `lg:` breakpoint.
+      */}
       <aside
-        className="hidden lg:flex flex-col w-72 shrink-0 h-screen sticky top-0"
-        style={{
-          background: "rgba(6,13,31,0.95)",
-          borderRight: "1px solid rgba(255,255,255,0.07)",
-          backdropFilter: "blur(20px)",
-        }}
-      >
-        {sidebarContent}
-      </aside>
-
-      {/* Mobile drawer */}
-      <aside
-        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-80 transition-transform duration-300 ${
+        className={`fixed lg:sticky inset-y-0 lg:inset-y-auto left-0 lg:top-0 z-50 w-80 lg:w-72 h-screen flex flex-col shrink-0 transition-transform duration-300 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } lg:translate-x-0`}
         style={{
-          background: "rgba(6,13,31,0.98)",
-          borderRight: "1px solid rgba(255,255,255,0.1)",
+          background: "rgba(6,13,31,0.97)",
+          borderRight: "1px solid rgba(255,255,255,0.08)",
           backdropFilter: "blur(20px)",
         }}
       >

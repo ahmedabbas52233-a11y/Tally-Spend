@@ -8,7 +8,10 @@ import pandas as pd
 
 DEFAULT_COLUMNS = {
     "date": ["date", "transaction_date", "posted", "posting_date", "txn_date"],
-    "amount": ["amount", "amt", "debit", "credit", "transaction_amount", "value", "sum"],
+    # NOTE: "debit"/"credit" are intentionally NOT listed here — they're handled
+    # by dedicated merge logic in normalize() so income isn't silently dropped
+    # when a statement uses separate Debit/Credit columns instead of one signed Amount.
+    "amount": ["amount", "amt", "transaction_amount", "value", "sum"],
     "description": ["description", "details", "narration", "memo", "narrative", "payee"],
     "account": ["account", "account_name", "source", "wallet", "bank", "card"],
 }
@@ -98,6 +101,18 @@ def assign_category(merchant: str, description: str = "") -> str:
     return "Other"
 
 
+def _clean_numeric_series(s: pd.Series) -> pd.Series:
+    """Parse currency-formatted strings: strips $/£/€ symbols, thousands
+    separators, surrounding whitespace, and converts accounting-style
+    parenthesized negatives e.g. "(123.45)" -> "-123.45" before casting."""
+    s = s.astype(str).str.strip()
+    is_paren_negative = s.str.match(r"^\(.*\)$")
+    s = s.str.replace(r"[()$£€,]", "", regex=True)
+    out = pd.to_numeric(s, errors="coerce")
+    out = out.where(~is_paren_negative, -out.abs())
+    return out
+
+
 def normalize(df: pd.DataFrame, source_name: str = "import") -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
@@ -112,25 +127,43 @@ def normalize(df: pd.DataFrame, source_name: str = "import") -> pd.DataFrame:
     else:
         df["date"] = pd.NaT
 
-    # Amount
-    amt_col = mapping.get("amount")
-    if not amt_col or amt_col not in df.columns:
+    # Amount — three strategies, in priority order:
+    #   1. A single explicit amount-like column (amount, amt, transaction_amount, value, sum)
+    #   2. Separate Debit + Credit columns (very common in real bank exports) -> merge
+    #      into one signed column: debit becomes negative, credit stays positive.
+    #   3. Heuristic fallback: pick whichever column is >50% numeric.
+    lower_cols = {c.lower().strip(): c for c in df.columns}
+    debit_col  = lower_cols.get("debit")
+    credit_col = lower_cols.get("credit")
+    single_amount_names = ["amount", "amt", "transaction_amount", "value", "sum"]
+    single_amt_col = next((lower_cols[n] for n in single_amount_names if n in lower_cols), None)
+
+    if single_amt_col:
+        df["amount"] = _clean_numeric_series(df[single_amt_col])
+    elif debit_col and credit_col:
+        debit_vals  = _clean_numeric_series(df[debit_col]).fillna(0)
+        credit_vals = _clean_numeric_series(df[credit_col]).fillna(0)
+        # If a row has neither value present, amount should be NaN (dropped later),
+        # not silently coerced to 0 — so re-flag rows where both source cells were blank.
+        both_blank = (df[debit_col].astype(str).str.strip() == "") & (df[credit_col].astype(str).str.strip() == "")
+        df["amount"] = (credit_vals - debit_vals).where(~both_blank, pd.NA)
+    elif debit_col:
+        # Debit-only ledger (e.g. an expenses-only export): every value is an outflow.
+        df["amount"] = -_clean_numeric_series(df[debit_col]).abs()
+    elif credit_col:
+        # Credit-only ledger (e.g. an income-only export): every value is an inflow.
+        df["amount"] = _clean_numeric_series(df[credit_col]).abs()
+    else:
+        amt_col = None
         for c in df.columns:
             try:
-                converted = pd.to_numeric(
-                    df[c].replace("", "0"), errors="coerce"
-                )
+                converted = pd.to_numeric(df[c].replace("", "0"), errors="coerce")
                 if converted.notna().sum() > len(df) * 0.5:
                     amt_col = c
                     break
             except Exception:
                 continue
-    if amt_col and amt_col in df.columns:
-        df["amount"] = pd.to_numeric(
-            df[amt_col].astype(str).str.replace(",", ""), errors="coerce"
-        )
-    else:
-        df["amount"] = pd.NA
+        df["amount"] = _clean_numeric_series(df[amt_col]) if amt_col else pd.NA
 
     # Description
     desc_col = mapping.get("description") or next(
@@ -151,9 +184,14 @@ def normalize(df: pd.DataFrame, source_name: str = "import") -> pd.DataFrame:
     df["is_recurring"] = False
     df["tags"] = ""
 
+    rows_before_drop = len(df)
     df = df.dropna(subset=["date", "amount"])
+    dropped = rows_before_drop - len(df)
     cols = ["date", "amount", "description", "merchant", "category", "account", "is_recurring", "tags"]
-    return df[cols].reset_index(drop=True)
+    result = df[cols].reset_index(drop=True)
+    result.attrs["rows_dropped"] = dropped
+    result.attrs["rows_in"] = rows_before_drop
+    return result
 
 
 def detect_recurring(df: pd.DataFrame, months_window: int = 3) -> pd.DataFrame:
