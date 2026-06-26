@@ -1,8 +1,26 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { KPICards } from "./KPICards";
-import { MonthlyChart, CategoryChart, TopMerchantsChart, RecurringList } from "./Charts";
 import { DataTable } from "./DataTable";
 import { Loader2, TrendingUp } from "lucide-react";
+
+// Recharts is the single largest dependency in this app (~570kB minified).
+// Lazy-loading the whole Charts module means it's fetched only once the user
+// actually has data to chart — not as part of the initial page load, which
+// previously included it unconditionally even on the empty "Ready to analyze"
+// screen where no chart is rendered at all.
+const MonthlyChart = lazy(() => import("./Charts").then((m) => ({ default: m.MonthlyChart })));
+const CategoryChart = lazy(() => import("./Charts").then((m) => ({ default: m.CategoryChart })));
+const TopMerchantsChart = lazy(() => import("./Charts").then((m) => ({ default: m.TopMerchantsChart })));
+const RecurringList = lazy(() => import("./Charts").then((m) => ({ default: m.RecurringList })));
+
+function ChartSkeleton({ height = 280 }) {
+  return (
+    <div
+      className="rounded-2xl animate-pulse"
+      style={{ height, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}
+    />
+  );
+}
 
 export function Dashboard({ data, loading, topMerchants, recurringSummary, healthScore }) {
   if (loading && !data) {
@@ -111,15 +129,23 @@ export function Dashboard({ data, loading, topMerchants, recurringSummary, healt
       {/* Row 2: Monthly + Category */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">
-          <MonthlyChart data={data.monthly} />
+          <Suspense fallback={<ChartSkeleton />}>
+            <MonthlyChart data={data.monthly} />
+          </Suspense>
         </div>
-        <CategoryChart data={data.categories} />
+        <Suspense fallback={<ChartSkeleton />}>
+          <CategoryChart data={data.categories} />
+        </Suspense>
       </div>
 
       {/* Row 3: Top Merchants + Recurring */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <TopMerchantsChart data={topMerchants} />
-        <RecurringList data={recurringSummary} />
+        <Suspense fallback={<ChartSkeleton height={240} />}>
+          <TopMerchantsChart data={topMerchants} />
+        </Suspense>
+        <Suspense fallback={<ChartSkeleton height={240} />}>
+          <RecurringList data={recurringSummary} />
+        </Suspense>
       </div>
 
       {/* Anomalies */}
