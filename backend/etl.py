@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Mapping
 
 import pandas as pd
 
@@ -66,7 +66,7 @@ COMMON_WORDS = {
 }
 
 
-def _find_column(cols: Iterable[str], candidates: Dict[str, Iterable[str]]) -> Dict[str, str]:
+def _find_column(cols: Iterable[str], candidates: Mapping[str, Iterable[str]]) -> Dict[str, str]:
     mapping: Dict[str, str] = {}
     lower = {c.lower().strip(): c for c in cols}
     for canon, names in candidates.items():
@@ -197,12 +197,14 @@ def normalize(df: pd.DataFrame, source_name: str = "import") -> pd.DataFrame:
 def detect_recurring(df: pd.DataFrame, months_window: int = 3) -> pd.DataFrame:
     df = df.copy()
     df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
-    grouped = df.groupby(["merchant", "amount"]).agg(
-        months=("month", lambda x: sorted(set(x.astype(str))))
+    grouped = (
+        df.groupby(["merchant", "amount"])
+        .agg(months=("month", lambda x: sorted(set(x.astype(str)))))
+        .reset_index()
     )
     recurring = {
-        (merchant, amount)
-        for (merchant, amount), row in grouped.iterrows()
+        (row["merchant"], row["amount"])
+        for _, row in grouped.iterrows()
         if len(row["months"]) >= months_window
     }
     df["is_recurring"] = df.apply(
